@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>RouteMaster • India Logistics</title>
+  <title>Campus Transit • College Bus Tracker</title>
   <link rel="icon" type="image/png" href="https://img.icons8.com/ios/50/bus.png">
 
   <!-- Fonts & Icons -->
@@ -19,14 +19,39 @@
 </head>
 
 <body>
-<div class="app-wrapper">
+
+<!-- ═══ Login Overlay ══════════════════════════════════════════════════════ -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card glass">
+    <div class="logo-icon" style="width: 60px; height: 60px; margin: 0 auto 15px; box-shadow: 0 4px 15px rgba(99,102,241,.3);"></div>
+    <h2 style="text-align: center; margin-bottom: 8px;">Campus Transit</h2>
+    <p style="text-align: center; color: var(--text-muted); margin-bottom: 24px;">Sign in to continue</p>
+    <form id="loginForm">
+      <div style="margin-bottom: 16px;">
+        <label style="display:block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem;">Username</label>
+        <input type="text" id="loginUser" class="select-input" placeholder="admin, driver, student" required style="width:100%; padding: 12px;">
+      </div>
+      <div style="margin-bottom: 24px;">
+        <label style="display:block; margin-bottom: 6px; font-weight: 500; font-size: 0.9rem;">Password</label>
+        <input type="password" id="loginPass" class="select-input" value="" required style="width:100%; padding: 12px;">
+      </div>
+      <button type="submit" class="primary-btn" id="loginSubmitBtn" style="width: 100%; padding: 12px; font-size: 1rem;">Access Dashboard</button>
+    </form>
+    <div style="margin-top: 20px; font-size: 0.8rem; color: var(--text-muted); text-align: center; background: rgba(99,102,241,0.1); padding: 10px; border-radius: 8px;">
+      Demo accounts (user/pass): <br><b>admin</b>, <b>student</b><br>
+      Drivers: <b>driver1</b>, <b>driver2</b>, <b>driver3</b>
+    </div>
+  </div>
+</div>
+
+<div class="app-wrapper" id="appWrapper" style="display: none;">
 
   <!-- ═══ Sidebar ═══════════════════════════════════════════════════════════ -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="logo">
         <div class="logo-icon"></div>
-        <span>Route<span class="text-primary">Master</span></span>
+        <span>Campus<span class="text-primary">Transit</span></span>
       </div>
       <button class="sidebar-collapse" id="sidebarToggle" title="Toggle sidebar">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
@@ -42,23 +67,37 @@
              fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/>
           <rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
           <rect x="14" y="14" width="7" height="7"/></svg>
-        <span>Dashboard</span>
+        <span class="role" id="userRoleBadge">Admin</span>
       </a>
-      <a href="#" class="nav-item" data-view="map">
+      <a href="#" class="nav-item" data-view="map" id="navMap">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2">
           <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
           <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
         <span>Live Map</span>
       </a>
-      <a href="#" class="nav-item" data-view="analytics">
+      <a href="#" class="nav-item" data-view="analytics" id="navAnalytics">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
           <polyline points="17 6 23 6 23 12"/></svg>
         <span>Analytics</span>
       </a>
-      <a href="#" class="nav-item" data-view="settings">
+      <a href="#" class="nav-item" data-view="history" id="navHistory">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/></svg>
+        <span>History Playback</span>
+      </a>
+      <a href="#" class="nav-item" data-view="driver" id="navDriver" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2h2"/>
+          <circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+        <span>Driver Route</span>
+      </a>
+      <a href="#" class="nav-item" data-view="settings" id="navSettings">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/>
@@ -70,6 +109,15 @@
             a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
             a1.65 1.65 0 0 0-1.51 1z"/></svg>
         <span>Settings</span>
+      </a>
+      <a href="#" class="nav-item" id="navLogout" style="color: #ef4444; margin-top: auto;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        <span>Log Out</span>
       </a>
     </nav>
 
@@ -90,7 +138,7 @@
         <img src="https://ui-avatars.com/api/?name=Rajesh+Kumar&background=6366f1&color=fff" alt="Rajesh Kumar">
         <div class="user-details">
           <p class="name">Rajesh Kumar</p>
-          <p class="role">Fleet Manager</p>
+          <p class="role" id="sidebarRoleLabel">Admin</p>
         </div>
       </div>
     </div>
@@ -144,7 +192,7 @@
                 <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
             </div>
             <div class="stat-content">
-              <span class="stat-label">Active Vehicles</span>
+              <span class="stat-label">Active Buses</span>
               <span class="stat-value" id="statActiveVehicles">0</span>
             </div>
           </div>
@@ -195,11 +243,11 @@
           <div class="region-card glass">
             <h3>Region Activity</h3>
             <div class="region-list" id="regionList">
-              <div class="region-item"><span>Sector 29</span><span class="badge">24</span></div>
-              <div class="region-item"><span>Bhupani</span><span class="badge">18</span></div>
-              <div class="region-item"><span>Badarpur Border</span><span class="badge">17</span></div>
-              <div class="region-item"><span>Sector 15</span><span class="badge">15</span></div>
-              <div class="region-item"><span>Sector 16</span><span class="badge">12</span></div>
+              <div class="region-item"><span>North Campus</span><span class="badge">24</span></div>
+              <div class="region-item"><span>Engineering Block</span><span class="badge">18</span></div>
+              <div class="region-item"><span>Main Library</span><span class="badge">17</span></div>
+              <div class="region-item"><span>South Campus</span><span class="badge">15</span></div>
+              <div class="region-item"><span>Hostels</span><span class="badge">12</span></div>
             </div>
           </div>
         </div>
@@ -246,7 +294,7 @@
 
           <!-- Fleet overlay -->
           <div class="fleet-overlay glass">
-            <h4>Active Fleet</h4>
+            <h4>Active Buses</h4>
             <div id="fleetList" class="fleet-list"></div>
           </div>
         </div>
@@ -266,8 +314,79 @@
               <canvas id="hoursChart"></canvas>
             </div>
             <div class="chart-card glass" style="grid-column:span 2">
-              <h3>Region Distribution</h3>
+              <h3>Campus Zones</h3>
               <canvas id="regionChart" style="max-height:220px;"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── History Playback ───────────────────────────────────────────────────── -->
+      <div id="historyView" class="view">
+        <div class="history-container" style="max-width: 1000px;">
+          <h2>Route Playback</h2>
+          <div class="history-card glass" style="padding: 24px; border-radius: 20px; box-shadow: var(--shadow);">
+            <div class="history-controls" style="display: flex; gap: 20px; align-items: flex-end;">
+              <div class="setting-item" style="border:none; padding: 0; flex: 1;">
+                <span style="display:block; margin-bottom: 8px; font-weight: 600;">Select Bus:</span>
+                <select id="historyDeviceSelect" class="select-input" style="width: 100%; padding: 10px;">
+                  <option value="">Waiting for devices...</option>
+                </select>
+              </div>
+              <button class="primary-btn" id="loadHistoryBtn" style="padding: 10px 24px;">Load History</button>
+            </div>
+            
+            <div id="playbackControls" style="display:none; margin-top:30px;">
+              <div style="display:flex; align-items:center; gap: 20px;">
+                <button class="primary-btn" id="playRouteBtn" style="border-radius: 50%; width: 50px; height: 50px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                </button>
+                <div style="flex:1;">
+                  <input type="range" id="routeSlider" min="0" max="100" value="0" style="width: 100%; cursor: pointer;">
+                  <div style="display:flex; justify-content:space-between; font-size: 0.85rem; color: var(--text-muted); margin-top: 8px; font-weight: 500;">
+                    <span id="routeStartLabel">Start</span>
+                    <span id="routeEndLabel">End</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="map-preview-card glass" style="margin-top: 24px; height: 400px; padding:0; overflow:hidden; border-radius: 20px;">
+            <div id="historyMap" style="width:100%; height:100%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Driver Controls ────────────────────────────────────────────────── -->
+      <div id="driverView" class="view">
+        <div class="history-container" style="max-width: 600px; text-align: center; margin-top: 40px;">
+          <h2>Driver Interface</h2>
+          <p style="color: var(--text-muted); margin-bottom: 30px;">Tap below to begin broadcasting your live location to the campus network.</p>
+          <div class="chart-card glass" style="padding: 40px; margin-bottom: 30px;">
+            <button class="primary-btn" id="toggleDriverTrackingBtn" style="width: 200px; height: 200px; border-radius: 50%; font-size: 1.5rem; transition: all 0.3s; background: var(--primary); box-shadow: 0 4px 30px rgba(99,102,241,0.5);">
+              Start Route
+            </button>
+            <p id="driverStatusText" style="margin-top: 20px; font-weight: 500;">Status: Offline</p>
+          </div>
+          
+          <div class="chart-card glass" style="padding: 30px; text-align: left;">
+            <h3 style="margin-bottom: 16px;">Route Stops Checklist</h3>
+            <div class="setting-item">
+              <span style="font-weight: 600; font-size: 1.05rem;">North Campus Station</span>
+              <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+              <span style="font-weight: 600; font-size: 1.05rem;">Engineering Block</span>
+              <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+              <span style="font-weight: 600; font-size: 1.05rem;">Main Library Stop</span>
+              <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+            </div>
+            <div class="setting-item">
+              <span style="font-weight: 600; font-size: 1.05rem;">South Campus Hostels</span>
+              <label class="switch"><input type="checkbox"><span class="slider"></span></label>
             </div>
           </div>
         </div>
@@ -325,6 +444,15 @@
               <div class="setting-item">
                 <span>Tracked Devices</span>
                 <span id="deviceCount">0</span>
+              </div>
+            </div>
+            
+            <div class="settings-card glass">
+              <h3>System Actions</h3>
+              <div class="setting-item" style="border: none; margin-top: 10px;">
+                <button class="primary-btn" id="logoutBtn" style="width: 100%; padding: 12px; background: #ef4444;">
+                  Log Out
+                </button>
               </div>
             </div>
           </div>

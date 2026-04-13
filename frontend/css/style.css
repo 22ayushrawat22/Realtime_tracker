@@ -1,38 +1,45 @@
 /* ── Variables ──────────────────────────────────────────────────────────── */
 :root {
-  --primary:       #6366f1;
-  --primary-light: #818cf8;
-  --bg:            #f1f5f9;
-  --surface:       #ffffff;
-  --text:          #0f172a;
-  --text-muted:    #64748b;
-  --border:        #e2e8f0;
-  --glass-bg:      rgba(255,255,255,0.72);
-  --glass-border:  rgba(255,255,255,0.55);
-  --shadow:        0 10px 30px -5px rgba(0,0,0,0.1);
-  --transition:    all 0.3s cubic-bezier(.25,.8,.25,1);
+  --primary:       #4F46E5; /* Indigo 600 */
+  --primary-light: #6366F1;
+  --bg:            #F8FAFC; /* Slate 50 */
+  --surface:       #FFFFFF;
+  --text:          #0F172A;
+  --text-muted:    #64748B;
+  --border:        #E2E8F0;
+  --card-bg:       #FFFFFF;
+  --shadow:        0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-hover:  0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --transition:    all 0.2s ease;
 }
 
 .dark {
-  --bg:           #0b1120;
-  --surface:      #1e293b;
-  --text:         #f8fafc;
-  --text-muted:   #94a3b8;
-  --border:       #334155;
-  --glass-bg:     rgba(30,41,59,0.82);
-  --glass-border: rgba(51,65,85,0.55);
+  --bg:           #0B1120;
+  --surface:      #111827;
+  --text:         #F8FAFC;
+  --text-muted:   #94A3B8;
+  --border:       #1F2937;
+  --card-bg:      #111827;
+  --shadow:       0 4px 6px -1px rgba(0, 0, 0, 0.2);
 }
 
 /* ── Reset & Base ───────────────────────────────────────────────────────── */
 *,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
 
 body {
-  font-family: 'Plus Jakarta Sans', sans-serif;
-  background: var(--bg);
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   color: var(--text);
+  background: var(--bg);
   height: 100vh;
   overflow: hidden;
 }
+
+body.dark {
+  background: var(--bg);
+}
+
+/* Base input overrides to support transparent glass aesthetics */
+input, select, button { color: inherit; font-family: inherit; }
 
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 .app-wrapper {
@@ -139,10 +146,9 @@ body {
 }
 
 .glass {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
 }
 
 .weather-widget {
@@ -162,8 +168,8 @@ body {
   gap: 12px;
   padding: 8px 10px;
   border-radius: 16px;
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
 }
 .user-profile img {
   width: 40px; height: 40px;
@@ -601,3 +607,34 @@ input:checked + .slider::before { transform: translateX(23px); }
 .leaflet-control-attribution {
   font-family: inherit;
 }
+
+/* ── Login Overlay ────────────────────────────────────────────────────────── */
+.login-overlay {
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+  background: var(--bg);
+  z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+}
+.login-card {
+  width: 100%; max-width: 420px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 48px; 
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.1);
+}
+.dark .login-overlay { background: var(--bg); }
+.dark .login-card { box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+
+/* ── Custom Buttons ──────────────────────────────────────────────────────── */
+.primary-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+.primary-btn:hover { background: var(--primary-light); }

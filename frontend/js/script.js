@@ -16,7 +16,16 @@ const state = {
   devices: new Map(),       // id → device object
   charts: {},
   tileLayers: {},
-  activeStyle: 'voyager'
+  activeStyle: 'voyager',
+  historyMap: null,
+  historyPolyline: null,
+  historyMarker: null,
+  historyData: [],
+  historyAnimInterval: null,
+  role: null,
+  username: null,
+  driverTracking: false,
+  driverWatch: null
 };
 
 // ── DOM Refs ──────────────────────────────────────────────────────────────────
@@ -25,6 +34,7 @@ const $ = id => document.getElementById(id);
 // ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   applyTheme(state.theme);
+  initLogin();
   initMaps();
   initSocket();
   initNavigation();
@@ -127,24 +137,6 @@ function initSocket() {
   socket.on('connect', () => {
     setConnectionStatus(true);
     showToast('Connected to server', 'success');
-
-    // Try to register this browser session as a device (HQ marker)
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => socket.emit('register-device', {
-          name: 'HQ',
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          speed: 0
-        }),
-        () => socket.emit('register-device', {
-          name: 'HQ',
-          latitude: 28.6139,
-          longitude: 77.2090,
-          speed: 0
-        })
-      );
-    }
   });
 
   socket.on('disconnect', () => {
@@ -156,11 +148,7 @@ function initSocket() {
     if (!Array.isArray(devices)) return;
     syncDevices(devices);
   });
-
-  // If no real devices arrive within 1.5 s, spin up demo data
-  setTimeout(() => {
-    if (state.devices.size === 0) startDemo();
-  }, 1500);
+  // Demo mode removed
 }
 
 function setConnectionStatus(online) {
@@ -279,30 +267,7 @@ function updateFleetList() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  DEMO SIMULATION
-// ═══════════════════════════════════════════════════════════════════════════
-const DEMO_DEVICES = [
-  { id: 'demo1', name: 'Truck MH-01', lat: 19.076, lng: 72.878, speed: 45 },
-  { id: 'demo2', name: 'Van DL-02',   lat: 28.614, lng: 77.209, speed: 32 },
-  { id: 'demo3', name: 'Bus KA-03',   lat: 12.972, lng: 77.595, speed: 28 },
-  { id: 'demo4', name: 'Truck TN-04', lat: 13.083, lng: 80.271, speed: 51 },
-  { id: 'demo5', name: 'Van GJ-05',   lat: 23.022, lng: 72.571, speed: 38 }
-];
-
-function startDemo() {
-  syncDevices(JSON.parse(JSON.stringify(DEMO_DEVICES)));
-  showToast('Demo mode – simulating 5 vehicles', 'info');
-
-  setInterval(() => {
-    const updated = Array.from(state.devices.values()).map(dev => ({
-      ...dev,
-      lat:   dev.lat + (Math.random() - 0.5) * 0.012,
-      lng:   dev.lng + (Math.random() - 0.5) * 0.012,
-      speed: Math.max(5, Math.min(90, dev.speed + (Math.random() - 0.5) * 12))
-    }));
-    syncDevices(updated);
-  }, 3000);
-}
+// Demo simulator has been removed and replaced by DB seed data.
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  MEASURE TOOL
@@ -406,7 +371,154 @@ function switchView(view) {
 
   if (view === 'map')       setTimeout(() => state.map.invalidateSize(), 120);
   if (view === 'dashboard') setTimeout(() => state.miniMap.invalidateSize(), 120);
+  if (view === 'history')   { 
+    setTimeout(() => initHistoryMap(), 120);
+    populateHistoryDropdown();
+  }
   if (view === 'analytics') initCharts();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  LOGIN & ROLES
+// ═══════════════════════════════════════════════════════════════════════════
+function initLogin() {
+  const form = $('loginForm');
+  if (!form) return;
+  
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = $('loginSubmitBtn');
+    btn.textContent = 'Authenticating...';
+    
+    const user = $('loginUser').value;
+    const pass = $('loginPass').value;
+    
+    try {
+      const res = await fetch('http://localhost:3000/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password: pass })
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        state.role = data.role;
+        state.username = user;
+        
+        // Save session locally
+        sessionStorage.setItem('campus_session', JSON.stringify({ role: data.role, username: user }));
+        
+        $('loginOverlay').style.display = 'none';
+        $('appWrapper').style.display = ''; 
+        
+        applyRoleState();
+        showToast('Login successful', 'success');
+      } else {
+        showToast(data.message, 'error');
+        btn.textContent = 'Access Dashboard';
+      }
+    } catch(err) {
+      showToast('Network error. Is backend running?', 'error');
+      btn.textContent = 'Access Dashboard';
+    }
+  });
+
+  // Check for existing session on page load
+  const existingSession = sessionStorage.getItem('campus_session');
+  if (existingSession) {
+    try {
+      const sess = JSON.parse(existingSession);
+      state.role = sess.role;
+      state.username = sess.username;
+      
+      $('loginOverlay').style.display = 'none';
+      $('appWrapper').style.display = ''; 
+      applyRoleState();
+    } catch(e) {}
+  }
+
+  // Driver UI logic attached here for convenience
+  const driverBtn = $('toggleDriverTrackingBtn');
+  if (driverBtn) {
+    driverBtn.addEventListener('click', () => {
+      if (state.driverTracking) {
+         state.driverTracking = false;
+         driverBtn.style.background = 'var(--primary)';
+         driverBtn.textContent = 'Start Route';
+         $('driverStatusText').textContent = 'Status: Offline';
+         if (state.driverWatch) {
+            clearInterval(state.driverWatch);
+            if (socket) socket.emit('stop-route', { id: 'bus_' + state.username.toLowerCase() });
+         }
+      } else {
+         if (!navigator.geolocation) return showToast('GPS not supported', 'error');
+         state.driverTracking = true;
+         driverBtn.style.background = '#10b981';
+         driverBtn.textContent = 'Stop Route';
+         $('driverStatusText').textContent = 'Status: Transmitting Live GPS...';
+         
+         // Configurable update delay (e.g., 5000ms = 5 seconds)
+         const UPDATE_DELAY_MS = 5000; 
+
+         const pingLocation = () => {
+           navigator.geolocation.getCurrentPosition(pos => {
+             if (socket) {
+               socket.emit('register-device', {
+                  id: 'bus_' + state.username.toLowerCase(),
+                  name: 'Bus ' + state.username.toUpperCase(),
+                  latitude: pos.coords.latitude,
+                  longitude: pos.coords.longitude,
+                  speed: (pos.coords.speed || 0) * 3.6
+               });
+             }
+           }, err => console.log('Location ping issue'), { enableHighAccuracy: true });
+         };
+
+         pingLocation(); // send first point immediately
+         state.driverWatch = setInterval(pingLocation, UPDATE_DELAY_MS);
+      }
+    });
+  }
+}
+
+function applyRoleState() {
+  const lbl = $('sidebarRoleLabel');
+  const bge = $('userRoleBadge');
+  if (lbl) lbl.textContent = state.role.toUpperCase();
+  if (bge) bge.textContent = state.role.toUpperCase();
+  
+  const navDash = document.querySelector('.nav-item[data-view="dashboard"]');
+  const navMap = $('navMap');
+  const navAnalytics = $('navAnalytics');
+  const navHistory = $('navHistory');
+  const navDriver = $('navDriver');
+  
+  if (state.role === 'student') {
+    if (navDash) navDash.style.display = 'none';
+    if (navAnalytics) navAnalytics.style.display = 'none';
+    if (navHistory) navHistory.style.display = 'none';
+    if (navDriver) navDriver.style.display = 'none';
+    
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    if (navMap) navMap.classList.add('active');
+    switchView('map');
+  } 
+  else if (state.role === 'driver') {
+    if (navDash) navDash.style.display = 'none';
+    if (navMap) navMap.style.display = 'none';
+    if (navAnalytics) navAnalytics.style.display = 'none';
+    if (navHistory) navHistory.style.display = 'none';
+    if (navDriver) {
+      navDriver.style.display = 'flex';
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      navDriver.classList.add('active');
+    }
+    
+    switchView('driver');
+  } 
+  else if (state.role === 'admin') {
+    if (navDriver) navDriver.style.display = 'none'; // Admin doesn't need to drive
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -574,6 +686,21 @@ function initSettings() {
 
   // Refresh map
   $('refreshMapBtn').addEventListener('click', () => { state.map.invalidateSize(); showToast('Map refreshed', 'info'); });
+
+  // Logout hooks
+  const logoutBtn = $('logoutBtn');
+  const navLogout = $('navLogout');
+
+  const processLogout = () => {
+    if (state.role === 'driver' && socket) {
+       socket.emit('stop-route', { id: 'bus_' + state.username.toLowerCase() });
+    }
+    sessionStorage.removeItem('campus_session');
+    window.location.reload();
+  };
+
+  if (logoutBtn) logoutBtn.addEventListener('click', processLogout);
+  if (navLogout) navLogout.addEventListener('click', processLogout);
 }
 
 function startVehicleAlerts() {
@@ -676,3 +803,141 @@ inlineStyle.textContent = `
   .fleet-item:hover { background: var(--border); }
 `;
 document.head.appendChild(inlineStyle);
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  HISTORY PLAYBACK (Added Feature)
+// ═══════════════════════════════════════════════════════════════════════════
+function initHistoryMap() {
+  if (state.historyMap) {
+    state.historyMap.invalidateSize();
+    return;
+  }
+  state.historyMap = L.map('historyMap', { center: [22.5, 78.5], zoom: 4 });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(state.historyMap);
+  
+  $('loadHistoryBtn').addEventListener('click', loadHistoryData);
+  $('playRouteBtn').addEventListener('click', togglePlayback);
+  $('routeSlider').addEventListener('input', e => renderFrame(parseInt(e.target.value)));
+}
+
+async function populateHistoryDropdown() {
+  const sel = $('historyDeviceSelect');
+  if (!sel) return;
+  
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Fetching vehicles from DB...</option>';
+  
+  try {
+    const res = await fetch('http://localhost:3000/api/history-devices');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    
+    sel.innerHTML = '<option value="">Select a vehicle...</option>';
+    if (!data.length) {
+      sel.innerHTML = '<option value="">No history tracked yet</option>';
+      return;
+    }
+    
+    data.forEach(dev => {
+      const opt = document.createElement('option');
+      opt.value = dev.id;
+      opt.textContent = dev.id;
+      sel.appendChild(opt);
+    });
+    if (current && data.find(d => d.id === current)) sel.value = current;
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error fetching DB</option>';
+  }
+}
+
+async function loadHistoryData() {
+  const devId = $('historyDeviceSelect').value;
+  if (!devId) return showToast('Please select a vehicle first', 'error');
+  
+  const btn = $('loadHistoryBtn');
+  btn.textContent = 'Loading...';
+  
+  try {
+    const res = await fetch(`http://localhost:3000/api/history/${devId}`);
+    if (!res.ok) throw new Error('API Error');
+    const rows = await res.json();
+    
+    if (!rows.length) {
+      showToast('No logged history found for this vehicle', 'info');
+      $('playbackControls').style.display = 'none';
+      btn.textContent = 'Load History';
+      return;
+    }
+    
+    state.historyData = rows;
+    setupPlaybackUI();
+  } catch(e) {
+    showToast('Failed to load history data', 'error');
+  }
+  btn.textContent = 'Load History';
+}
+
+function setupPlaybackUI() {
+  $('playbackControls').style.display = 'block';
+  $('routeSlider').max = state.historyData.length - 1;
+  $('routeSlider').value = 0;
+  
+  const start = new Date(state.historyData[0].logged_at).toLocaleTimeString();
+  const end = new Date(state.historyData[state.historyData.length - 1].logged_at).toLocaleTimeString();
+  
+  $('routeStartLabel').textContent = start;
+  $('routeEndLabel').textContent = end;
+  
+  if (state.historyPolyline) state.historyMap.removeLayer(state.historyPolyline);
+  if (state.historyMarker) state.historyMap.removeLayer(state.historyMarker);
+  
+  const coords = state.historyData.map(r => [r.lat, r.lng]);
+  state.historyPolyline = L.polyline(coords, { color: '#ef4444', weight: 4 }).addTo(state.historyMap);
+  state.historyMap.fitBounds(state.historyPolyline.getBounds(), { padding: [30, 30] });
+  
+  renderFrame(0);
+}
+
+function renderFrame(index) {
+  if (!state.historyData.length || index >= state.historyData.length) return;
+  const pt = state.historyData[index];
+  
+  if (!state.historyMarker) {
+    state.historyMarker = L.marker([pt.lat, pt.lng], { icon: truckIcon() }).addTo(state.historyMap);
+  } else {
+    state.historyMarker.setLatLng([pt.lat, pt.lng]);
+  }
+  
+  // Custom styling for timeline popup
+  state.historyMarker.bindPopup(`
+    <b>Historical Snapshot</b><br>
+    Speed: ${pt.speed.toFixed(1)} km/h<br>
+    Time: ${new Date(pt.logged_at).toLocaleTimeString()}
+  `).openPopup();
+  
+  $('routeSlider').value = index;
+}
+
+function togglePlayback() {
+  const btn = $('playRouteBtn');
+  if (state.historyAnimInterval) {
+    clearInterval(state.historyAnimInterval);
+    state.historyAnimInterval = null;
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+  } else {
+    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+    let i = parseInt($('routeSlider').value);
+    if (i >= state.historyData.length - 1) i = 0;
+    
+    state.historyAnimInterval = setInterval(() => {
+      if (i >= state.historyData.length) {
+        clearInterval(state.historyAnimInterval);
+        state.historyAnimInterval = null;
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+        return;
+      }
+      renderFrame(i);
+      i += 1;
+    }, 150); // Playback speed: 150ms per frame
+  }
+}

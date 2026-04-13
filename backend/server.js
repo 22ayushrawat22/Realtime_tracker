@@ -20,6 +20,34 @@ const pool = new Pool({
 async function initDB() {
   try {
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL
+      );
+    `);
+
+    // Seed default authentication users from .env
+    const getCreds = (envKey, defaultStr, role) =>
+      (process.env[envKey] || defaultStr).split(',')
+        .map(s => ({ u: s.split(':')[0], p: s.split(':')[1], r: role }))
+        .filter(x => x.u && x.p);
+
+    const usersToSeed = [
+      ...getCreds('ADMIN_CREDENTIALS', 'admin:admin', 'admin'),
+      ...getCreds('DRIVER_CREDENTIALS', 'driver:driver', 'driver'),
+      ...getCreds('STUDENT_CREDENTIALS', 'student:student', 'student')
+    ];
+
+    for (const usr of usersToSeed) {
+      await pool.query(
+        'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) ON CONFLICT (username) DO NOTHING',
+        [usr.u, usr.p, usr.r]
+      );
+    }
+
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS devices (
         id VARCHAR(255) PRIMARY KEY,
         name VARCHAR(255),
@@ -29,7 +57,7 @@ async function initDB() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS location_logs (
         id SERIAL PRIMARY KEY,
@@ -40,7 +68,7 @@ async function initDB() {
         logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
-    console.log("✅ NeonDB Connected & Schema Initialized");
+    console.log("✅ NeonDB Connected & Schema Initialized (Users, Devices, Logs)");
   } catch (err) {
     console.error("❌ Database initialization error:", err);
   }
@@ -59,7 +87,7 @@ setInterval(async () => {
       io.emit('devices-update', all);
       console.log(`🗑️  Removed ${res.rowCount} stale devices`);
     }
-  } catch(e) {}
+  } catch (e) { }
 }, 60_000);
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -80,8 +108,9 @@ io.on('connection', async (socket) => {
   socket.emit('devices-update', await devicesArray());
 
   socket.on('register-device', async (data) => {
-    const { name, latitude, longitude, speed } = data || {};
+    const { id, name, latitude, longitude, speed } = data || {};
     if (latitude == null || longitude == null) return;
+    const deviceId = id || socket.id;
 
     try {
       await pool.query(`
@@ -90,19 +119,20 @@ io.on('connection', async (socket) => {
         ON CONFLICT (id) DO UPDATE SET 
           name = EXCLUDED.name, lat = EXCLUDED.lat, lng = EXCLUDED.lng, 
           speed = EXCLUDED.speed, updated_at = EXCLUDED.updated_at
-      `, [socket.id, name || `Device ${socket.id.slice(0, 4)}`, latitude, longitude, speed || 0]);
-      
-      await pool.query('INSERT INTO location_logs (device_id, lat, lng, speed) VALUES ($1, $2, $3, $4)', [socket.id, latitude, longitude, speed || 0]);
+      `, [deviceId, name || `Device ${deviceId.slice(0, 4)}`, latitude, longitude, speed || 0]);
+
+      await pool.query('INSERT INTO location_logs (device_id, lat, lng, speed) VALUES ($1, $2, $3, $4)', [deviceId, latitude, longitude, speed || 0]);
       broadcastDevices();
-      console.log(`📍 Registered/Updated ID: ${socket.id}`);
-    } catch(err) {
+      console.log(`📍 Registered/Updated ID: ${deviceId}`);
+    } catch (err) {
       console.error(err);
     }
   });
 
   socket.on('update-location', async (data) => {
-    const { latitude, longitude, speed } = data || {};
+    const { id, latitude, longitude, speed } = data || {};
     if (latitude == null || longitude == null) return;
+    const deviceId = id || socket.id;
 
     try {
       await pool.query(`
@@ -112,11 +142,21 @@ io.on('connection', async (socket) => {
           lat = EXCLUDED.lat, lng = EXCLUDED.lng, 
           speed = COALESCE(EXCLUDED.speed, devices.speed), 
           updated_at = EXCLUDED.updated_at
-      `, [socket.id, `Device ${socket.id.slice(0,4)}`, latitude, longitude, speed]);
-      
-      await pool.query('INSERT INTO location_logs (device_id, lat, lng, speed) VALUES ($1, $2, $3, $4)', [socket.id, latitude, longitude, speed || 0]);
+      `, [deviceId, `Device ${deviceId.slice(0, 4)}`, latitude, longitude, speed]);
+
+      await pool.query('INSERT INTO location_logs (device_id, lat, lng, speed) VALUES ($1, $2, $3, $4)', [deviceId, latitude, longitude, speed || 0]);
       broadcastDevices();
-    } catch(err) {}
+    } catch (err) { }
+  });
+
+  socket.on('stop-route', async (data) => {
+    const { id } = data || {};
+    if (!id) return;
+    try {
+      await pool.query('DELETE FROM devices WHERE id = $1', [id]);
+      broadcastDevices();
+      console.log(`🛑 Stopped Route: ${id}`);
+    } catch (err) { }
   });
 
   socket.on('disconnect', async () => {
@@ -124,11 +164,25 @@ io.on('connection', async (socket) => {
     try {
       await pool.query('DELETE FROM devices WHERE id = $1', [socket.id]);
       broadcastDevices();
-    } catch(err) {}
+    } catch (err) { }
   });
 });
 
 // ── REST API ─────────────────────────────────────────────────────────────────
+app.post('/api/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const { rows } = await pool.query('SELECT role FROM users WHERE username = $1 AND password = $2', [username, password]);
+    if (rows.length > 0) {
+      res.json({ success: true, role: rows[0].role });
+    } else {
+      res.status(401).json({ success: false, message: 'Invalid credentials' });
+    }
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 app.get('/api/devices', async (_req, res) => {
   res.json(await devicesArray());
 });
@@ -136,7 +190,7 @@ app.get('/api/devices', async (_req, res) => {
 app.get('/api/analytics', (_req, res) => {
   res.json({
     distanceByDay: [120, 210, 180, 290, 340, 270, 190],
-    activeHours:   [2,   5,   8,   12,  10,  7,   4],
+    activeHours: [2, 5, 8, 12, 10, 7, 4],
     regionDistribution: [
       { region: 'Bhupani', count: 24 },
       { region: 'Sector 29', count: 18 },
@@ -147,11 +201,35 @@ app.get('/api/analytics', (_req, res) => {
   });
 });
 
+app.get('/api/history-devices', async (_req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT DISTINCT device_id as id FROM location_logs'
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/history/:deviceId', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+    const { rows } = await pool.query(
+      'SELECT lat, lng, speed, logged_at FROM location_logs WHERE device_id = $1 ORDER BY logged_at ASC LIMIT 500',
+      [deviceId]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/health', async (_req, res) => {
   try {
     const devices = await devicesArray();
     res.json({ status: 'ok', devices: devices.length, uptime: process.uptime() });
-  } catch(e) {
+  } catch (e) {
     res.status(500).json({ status: 'error', error: e.message });
   }
 });
