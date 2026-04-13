@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>RouteMaster • India Logistics</title>
+  <link rel="icon" type="image/png" href="https://img.icons8.com/ios/50/bus.png">
+
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+<div class="app-wrapper">
+
+  <!-- ═══ Sidebar ═══════════════════════════════════════════════════════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <div class="logo-icon"></div>
+        <span>Route<span class="text-primary">Master</span></span>
+      </div>
+      <button class="sidebar-collapse" id="sidebarToggle" title="Toggle sidebar">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/>
+        </svg>
+      </button>
+    </div>
+
+    <nav class="nav-menu">
+      <a href="#" class="nav-item active" data-view="dashboard">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/>
+          <rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+          <rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-view="map">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+          <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        <span>Live Map</span>
+      </a>
+      <a href="#" class="nav-item" data-view="analytics">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+          <polyline points="17 6 23 6 23 12"/></svg>
+        <span>Analytics</span>
+      </a>
+      <a href="#" class="nav-item" data-view="settings">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33
+            1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06
+            a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+            A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9
+            4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06
+            a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+            a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="weather-widget glass" id="weatherWidget">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="8" y1="19" x2="8" y2="21"/><line x1="8" y1="13" x2="8" y2="15"/>
+          <line x1="16" y1="19" x2="16" y2="21"/><line x1="16" y1="13" x2="16" y2="15"/>
+          <line x1="12" y1="21" x2="12" y2="23"/><line x1="12" y1="15" x2="12" y2="17"/>
+          <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25"/></svg>
+        <div class="weather-info">
+          <span class="temp" id="weatherTemp">28°C</span>
+          <span class="desc" id="weatherDesc">Light rain</span>
+        </div>
+      </div>
+      <div class="user-profile">
+        <img src="https://ui-avatars.com/api/?name=Rajesh+Kumar&background=6366f1&color=fff" alt="Rajesh Kumar">
+        <div class="user-details">
+          <p class="name">Rajesh Kumar</p>
+          <p class="role">Fleet Manager</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══ Main Content ══════════════════════════════════════════════════════ -->
+  <main class="main-content">
+
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="page-title">
+        <h1 id="pageTitle">Dashboard</h1>
+        <p id="pageSubtitle">Welcome back, Rajesh</p>
+      </div>
+      <div class="top-actions">
+        <div class="search-box">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="text" placeholder="Search vehicles, routes…" id="searchInput">
+        </div>
+        <div class="connection-badge" id="connectionBadge">
+          <span class="pulse-dot"></span>
+          <span id="connectionText">Connecting…</span>
+        </div>
+        <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+          <svg id="themeIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Views -->
+    <div class="view-container">
+
+      <!-- ── Dashboard ──────────────────────────────────────────────────── -->
+      <div id="dashboardView" class="view active">
+        <div class="dashboard-grid">
+          <div class="stat-card glass">
+            <div class="stat-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+            </div>
+            <div class="stat-content">
+              <span class="stat-label">Active Vehicles</span>
+              <span class="stat-value" id="statActiveVehicles">0</span>
+            </div>
+          </div>
+          <div class="stat-card glass">
+            <div class="stat-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                <path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+            </div>
+            <div class="stat-content">
+              <span class="stat-label">Total Distance</span>
+              <span class="stat-value" id="statTotalDistance">0 km</span>
+            </div>
+          </div>
+          <div class="stat-card glass">
+            <div class="stat-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="stat-content">
+              <span class="stat-label">Avg. Speed</span>
+              <span class="stat-value" id="statAvgSpeed">0 km/h</span>
+            </div>
+          </div>
+          <div class="stat-card glass">
+            <div class="stat-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+                <circle cx="12" cy="10" r="3"/></svg>
+            </div>
+            <div class="stat-content">
+              <span class="stat-label">Coverage</span>
+              <span class="stat-value" id="statCoverage">0 regions</span>
+            </div>
+          </div>
+
+          <!-- Mini Map -->
+          <div class="map-preview-card glass">
+            <h3>Live Fleet Preview</h3>
+            <div id="miniMap"></div>
+          </div>
+
+          <!-- Region list -->
+          <div class="region-card glass">
+            <h3>Region Activity</h3>
+            <div class="region-list" id="regionList">
+              <div class="region-item"><span>Sector 29</span><span class="badge">24</span></div>
+              <div class="region-item"><span>Bhupani</span><span class="badge">18</span></div>
+              <div class="region-item"><span>Badarpur Border</span><span class="badge">17</span></div>
+              <div class="region-item"><span>Sector 15</span><span class="badge">15</span></div>
+              <div class="region-item"><span>Sector 16</span><span class="badge">12</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Live Map ───────────────────────────────────────────────────── -->
+      <div id="mapView" class="view">
+        <div id="mapContainer">
+          <div id="map"></div>
+
+          <!-- Controls -->
+          <div class="map-controls">
+            <button class="map-control-btn" id="measureBtn" title="Measure distance">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7
+                  a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z"/>
+                <path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/>
+                <path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/></svg>
+            </button>
+            <button class="map-control-btn" id="locateBtn" title="My location">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
+            </button>
+            <button class="map-control-btn" id="refreshMapBtn" title="Refresh map">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                   fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+            </button>
+          </div>
+
+          <!-- Distance result -->
+          <div class="distance-panel glass" id="distancePanel" style="display:none;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7
+                a2.4 2.4 0 0 1 0-3.4l2.6-2.6a2.4 2.4 0 0 1 3.4 0Z"/></svg>
+            <span id="distanceValue">0.0 km</span>
+            <button id="clearMeasureBtn" title="Clear">✕</button>
+          </div>
+
+          <!-- Fleet overlay -->
+          <div class="fleet-overlay glass">
+            <h4>Active Fleet</h4>
+            <div id="fleetList" class="fleet-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Analytics ──────────────────────────────────────────────────── -->
+      <div id="analyticsView" class="view">
+        <div class="analytics-container">
+          <h2>Route &amp; Performance Analytics</h2>
+          <div class="chart-grid">
+            <div class="chart-card glass">
+              <h3>Distance Covered (Last 7 days)</h3>
+              <canvas id="distanceChart"></canvas>
+            </div>
+            <div class="chart-card glass">
+              <h3>Active Hours per Day</h3>
+              <canvas id="hoursChart"></canvas>
+            </div>
+            <div class="chart-card glass" style="grid-column:span 2">
+              <h3>Region Distribution</h3>
+              <canvas id="regionChart" style="max-height:220px;"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Settings ───────────────────────────────────────────────────── -->
+      <div id="settingsView" class="view">
+        <div class="settings-container">
+          <h2>Settings</h2>
+          <div class="settings-grid">
+            <div class="settings-card glass">
+              <h3>Appearance</h3>
+              <div class="setting-item">
+                <span>Dark Mode</span>
+                <label class="switch">
+                  <input type="checkbox" id="darkModeToggle">
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="setting-item">
+                <span>Map Style</span>
+                <select id="mapStyleSelect" class="select-input">
+                  <option value="voyager">Voyager</option>
+                  <option value="streets">Streets</option>
+                  <option value="satellite">Satellite</option>
+                </select>
+              </div>
+            </div>
+            <div class="settings-card glass">
+              <h3>Notifications</h3>
+              <div class="setting-item">
+                <span>Vehicle Alerts</span>
+                <label class="switch">
+                  <input type="checkbox" id="vehicleAlertsToggle" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <div class="setting-item">
+                <span>Route Deviations</span>
+                <label class="switch">
+                  <input type="checkbox" id="routeDeviationsToggle" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="settings-card glass">
+              <h3>About</h3>
+              <div class="setting-item">
+                <span>Version</span><span>1.0.0</span>
+              </div>
+              <div class="setting-item">
+                <span>Server</span>
+                <span id="serverStatus" style="color:#10b981;font-weight:600;">Online</span>
+              </div>
+              <div class="setting-item">
+                <span>Tracked Devices</span>
+                <span id="deviceCount">0</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /view-container -->
+  </main>
+</div><!-- /app-wrapper -->
+
+<!-- Toast container -->
+<div id="toastContainer" class="toast-container"></div>
+
+<!-- Scripts (order matters) -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+<script src="/js/script.js"></script>
+</body>
+</html>
