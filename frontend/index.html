@@ -97,20 +97,33 @@
           <circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></svg>
         <span>Driver Route</span>
       </a>
+      <a href="#" class="nav-item" data-view="stops" id="navStops" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+        </svg>
+        <span>Manage Stops</span>
+      </a>
+      <a href="#" class="nav-item" data-view="users" id="navUsers" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <span>Users</span>
+      </a>
       <a href="#" class="nav-item" data-view="settings" id="navSettings">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"/>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33
-            1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06
-            a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
-            A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9
-            4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06
-            a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
-            a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06 a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09 A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06 a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09 a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
         <span>Settings</span>
       </a>
-      <a href="#" class="nav-item" id="navLogout" style="color: #ef4444; margin-top: auto;">
+    </nav>
+
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item" id="navLogout" style="color: #ef4444;">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2">
           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -119,9 +132,6 @@
         </svg>
         <span>Log Out</span>
       </a>
-    </nav>
-
-    <div class="sidebar-footer">
       <div class="weather-widget glass" id="weatherWidget">
         <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2">
@@ -392,6 +402,113 @@
         </div>
       </div>
 
+      <!-- ── User Management ─────────────────────────────────────────────── -->
+      <div id="usersView" class="view">
+        <div class="history-container" style="max-width: 1000px;">
+          <h2>User Management</h2>
+          <p style="color: var(--text-muted); margin-bottom: 24px;">Create and manage driver, student, and admin accounts without touching the .env file.</p>
+
+          <!-- Create User Card -->
+          <div class="chart-card glass" style="padding: 28px; margin-bottom: 28px;">
+            <h3 style="margin-bottom: 20px;">Create New User</h3>
+            <form id="createUserForm" style="display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;">
+              <div style="flex: 2; min-width: 160px;">
+                <label style="font-size: 0.85rem; font-weight: 600; display:block; margin-bottom:6px;">Username</label>
+                <input type="text" id="newUsername" class="select-input" placeholder="e.g. driver2" required style="width:100%; padding: 10px;">
+              </div>
+              <div style="flex: 2; min-width: 160px;">
+                <label style="font-size: 0.85rem; font-weight: 600; display:block; margin-bottom:6px;">Password</label>
+                <input type="password" id="newPassword" class="select-input" placeholder="••••••••" required style="width:100%; padding: 10px;">
+              </div>
+              <div style="flex: 1; min-width: 130px;">
+                <label style="font-size: 0.85rem; font-weight: 600; display:block; margin-bottom:6px;">Role</label>
+                <select id="newRole" class="select-input" style="width:100%; padding: 10px;">
+                  <option value="student">Student</option>
+                  <option value="driver">Driver</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              <div style="flex: 0;">
+                <button type="submit" class="primary-btn" style="padding: 10px 24px; white-space:nowrap;">Add User</button>
+              </div>
+            </form>
+            <p id="createUserError" style="color:#ef4444; font-size: 0.85rem; margin-top: 10px; display:none;"></p>
+          </div>
+
+          <!-- Users Table Card -->
+          <div class="chart-card glass" style="padding: 28px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3>All Users</h3>
+              <button onclick="fetchUsers()" style="background: var(--border); border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 500; color: var(--text);">↻ Refresh</button>
+            </div>
+            <div style="overflow-x: auto;">
+              <table id="usersTable" style="width:100%; border-collapse: collapse; font-size: 0.92rem;">
+                <thead>
+                  <tr style="border-bottom: 2px solid var(--border);">
+                    <th style="text-align:left; padding: 10px 12px; color: var(--text-muted); font-weight: 600;">ID</th>
+                    <th style="text-align:left; padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Username</th>
+                    <th style="text-align:left; padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Role</th>
+                    <th style="text-align:left; padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Change Role</th>
+                    <th style="text-align:left; padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Reset Password</th>
+                    <th style="text-align:right; padding: 10px 12px; color: var(--text-muted); font-weight: 600;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="usersTableBody">
+                  <tr><td colspan="6" style="text-align:center; padding: 24px; color: var(--text-muted);">Loading users...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Manage Stops ────────────────────────────────────────────────── -->
+      <div id="stopsView" class="view">
+        <div class="history-container" style="max-width: 1100px;">
+          <h2>Route Stop Management</h2>
+          <p style="color: var(--text-muted); margin-bottom: 20px;">Click on the map to pinpoint a bus stop coordinates, assign it to a driver's username, and save it.</p>
+          <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            <!-- Map Picker -->
+            <div class="map-preview-card glass" style="flex: 2; min-width: 400px; height: 500px; padding:0; overflow:hidden; border-radius: 20px;">
+              <div id="stopPickerMap" style="width:100%; height:100%;"></div>
+            </div>
+            <!-- Form & List -->
+            <div class="chart-card glass" style="flex: 1; min-width: 300px; padding: 24px; display: flex; flex-direction: column;">
+              <h3 style="margin-bottom: 20px;">Create New Stop</h3>
+              <form id="createStopForm">
+                <div style="margin-bottom: 12px;">
+                  <label style="font-size: 0.9rem; font-weight: 500;">Stop Name</label>
+                  <input type="text" id="stopName" class="select-input" placeholder="e.g. Sector 29 Stop" required style="width:100%; padding: 10px;">
+                </div>
+                <div style="margin-bottom: 12px;">
+                  <label style="font-size: 0.9rem; font-weight: 500;">Assigned Driver (Username)</label>
+                  <input type="text" id="stopDriverId" class="select-input" placeholder="e.g. driver1" required style="width:100%; padding: 10px;">
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                   <div style="flex:1;">
+                     <label style="font-size: 0.9rem; font-weight: 500;">Lat</label>
+                     <input type="text" id="stopLat" class="select-input" required readonly style="width:100%; padding: 10px; background: rgba(0,0,0,0.05); color:var(--text-muted); cursor: not-allowed;">
+                   </div>
+                   <div style="flex:1;">
+                     <label style="font-size: 0.9rem; font-weight: 500;">Lng</label>
+                     <input type="text" id="stopLng" class="select-input" required readonly style="width:100%; padding: 10px; background: rgba(0,0,0,0.05); color:var(--text-muted); cursor: not-allowed;">
+                   </div>
+                </div>
+                <button type="submit" class="primary-btn" id="createStopBtn" style="width: 100%; padding: 12px;">Add Stop</button>
+              </form>
+
+              <hr style="border:0; border-top: 1px solid rgba(100,100,100,0.2); margin: 30px 0;">
+              
+              <h3 style="margin-bottom: 15px;">Active Stops</h3>
+              <div id="stopsList" style="flex:1; overflow-y: auto; max-height: 200px; padding-right: 10px;">
+                 <p style="color:var(--text-muted); font-size:0.9rem;" id="stopsEmptyState">Loading active stops...</p>
+                 <div id="stopsListContent"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Settings ───────────────────────────────────────────────────── -->
       <div id="settingsView" class="view">
         <div class="settings-container">
@@ -471,6 +588,7 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-<script src="/js/script.js"></script>
+<!-- App entry point (ES module – Vite handles bundling) -->
+<script type="module" src="/js/main.js"></script>
 </body>
 </html>

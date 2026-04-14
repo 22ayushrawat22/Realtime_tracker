@@ -25,7 +25,12 @@ const state = {
   role: null,
   username: null,
   driverTracking: false,
-  driverWatch: null
+  driverWatch: null,
+  etas: new Map(),
+  geofencedEvents: new Map(),
+  GEOFENCES: [
+    { id: 'campus', name: 'SDIET Campus', lat: 28.4237, lng: 77.4052, radius: 500, color: '#10b981' }
+  ]
 };
 
 // ── DOM Refs ──────────────────────────────────────────────────────────────────
@@ -41,6 +46,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initMeasureTool();
   initSettings();
   initSearch();
+  initStopsManager();
   fetchWeather();
 });
 
@@ -112,6 +118,9 @@ function initMaps() {
   state.map.addLayer(state.markerCluster);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(state.map);
 
+  // Geofences are rendered dynamically via fetchStops();
+  renderGeofences();
+
   // ── Mini map ──
   state.miniMap = L.map('miniMap', {
     center: [22.5, 78.5],
@@ -132,7 +141,12 @@ function initMaps() {
 let socket;
 
 function initSocket() {
-  socket = io('http://localhost:3000', { reconnectionAttempts: 5 });
+  const sess = sessionStorage.getItem('campus_session');
+  const token = sess ? JSON.parse(sess).token : null;
+  socket = io('http://localhost:3000', { 
+    reconnectionAttempts: 5,
+    auth: { token: token }
+  });
 
   socket.on('connect', () => {
     setConnectionStatus(true);
@@ -180,6 +194,33 @@ function truckIcon() {
   });
 }
 
+async function updateEta(id, lat, lng) {
+  const now = Date.now();
+  const cached = state.etas.get(id);
+  if (cached && (now - cached.lastChecked < 15000)) return;
+
+  state.etas.set(id, { ...cached, lastChecked: now, text: cached?.text || 'calculating...' });
+  
+  try {
+    const dest = state.GEOFENCES[0]; // Campus
+    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${lng},${lat};${dest.lng},${dest.lat}?overview=false`);
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    if (data.routes && data.routes.length > 0) {
+      const r = data.routes[0];
+      const mins = Math.round(r.duration / 60);
+      const kms = (r.distance / 1000).toFixed(1);
+      state.etas.set(id, { text: `${mins} min`, distance: `${kms} km`, lastChecked: now });
+      
+      const m = state.markers.get(id);
+      if (m && m.isPopupOpen()) {
+        m.setPopupContent(`<b>${state.devices.get(id)?.name}</b><br>Speed: ${(state.devices.get(id)?.speed||0).toFixed(1)} km/h<br>ETA: ${mins} min (${kms} km)`);
+      }
+      updateFleetList();
+    }
+  } catch(e) {}
+}
+
 function syncDevices(list) {
   state.devices.clear();
   state.markerCluster.clearLayers();
@@ -189,11 +230,35 @@ function syncDevices(list) {
     if (dev.lat == null || dev.lng == null) return;
     state.devices.set(dev.id, dev);
 
+    updateEta(dev.id, dev.lat, dev.lng);
+    
+    const etaData = state.etas.get(dev.id);
+    const etaString = etaData && etaData.text !== 'calculating...' ? `<br>ETA: ${etaData.text} (${etaData.distance})` : '';
+
     const marker = L.marker([dev.lat, dev.lng], { icon: truckIcon() })
-      .bindPopup(`<b>${dev.name}</b><br>Speed: ${dev.speed?.toFixed(1) ?? 0} km/h`);
+      .bindPopup(`<b>${dev.name}</b><br>Speed: ${dev.speed?.toFixed(1) ?? 0} km/h${etaString}`);
 
     state.markerCluster.addLayer(marker);
     state.markers.set(dev.id, marker);
+
+    // Core Geofencing alerts logic
+    state.GEOFENCES.forEach(zone => {
+      const zLatLng = L.latLng([zone.lat, zone.lng]);
+      const dLatLng = L.latLng([dev.lat, dev.lng]);
+      const dist = zLatLng.distanceTo(dLatLng);
+      const evKey = `${dev.id}_${zone.id}`;
+      if (dist <= zone.radius) {
+        if (!state.geofencedEvents.has(evKey)) {
+          const currentDriverId = dev.id.replace('bus_', '');
+          if (!zone.driver_id || zone.driver_id === currentDriverId || zone.driver_id === 'all' || zone.id === 'campus') {
+            state.geofencedEvents.set(evKey, true);
+            showToast(`🚨 ${dev.name} is arriving at ${zone.name}!`, 'success');
+          }
+        }
+      } else {
+        state.geofencedEvents.delete(evKey);
+      }
+    });
   });
 
   updateMiniMap();
@@ -249,7 +314,7 @@ function updateFleetList() {
       </svg>
       <div style="flex:1;min-width:0">
         <b style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${dev.name}</b>
-        <small style="color:var(--text-muted)">${(dev.speed || 0).toFixed(1)} km/h</small>
+        <small style="color:var(--text-muted)">${(dev.speed || 0).toFixed(1)} km/h • ETA: ${state.etas.get(dev.id)?.text || 'calc...'}</small>
       </div>
       <span class="badge">Active</span>
     </div>`).join('');
@@ -365,9 +430,9 @@ function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   $(`${view}View`).classList.add('active');
 
-  const titles = { dashboard: 'Dashboard', map: 'Live Map', analytics: 'Analytics', settings: 'Settings' };
+  const titles = { dashboard: 'Dashboard', map: 'Live Map', analytics: 'Analytics', settings: 'Settings', stops: 'Manage Stops', users: 'User Management' };
   $('pageTitle').textContent = titles[view] || view;
-  $('pageSubtitle').textContent = view === 'dashboard' ? 'Welcome back, Rajesh' : '';
+  $('pageSubtitle').textContent = view === 'dashboard' ? 'Welcome back, Admin' : '';
 
   if (view === 'map')       setTimeout(() => state.map.invalidateSize(), 120);
   if (view === 'dashboard') setTimeout(() => state.miniMap.invalidateSize(), 120);
@@ -376,6 +441,7 @@ function switchView(view) {
     populateHistoryDropdown();
   }
   if (view === 'analytics') initCharts();
+  if (view === 'users')     fetchUsers();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -406,10 +472,16 @@ function initLogin() {
         state.username = user;
         
         // Save session locally
-        sessionStorage.setItem('campus_session', JSON.stringify({ role: data.role, username: user }));
+        sessionStorage.setItem('campus_session', JSON.stringify({ role: data.role, username: user, token: data.token }));
         
         $('loginOverlay').style.display = 'none';
         $('appWrapper').style.display = ''; 
+        
+        // Re-authenticate WebSocket connection immediately
+        if (socket) {
+          socket.auth = { token: data.token };
+          socket.disconnect().connect();
+        }
         
         applyRoleState();
         showToast('Login successful', 'success');
@@ -517,8 +589,14 @@ function applyRoleState() {
     switchView('driver');
   } 
   else if (state.role === 'admin') {
-    if (navDriver) navDriver.style.display = 'none'; // Admin doesn't need to drive
+    if (navDriver) navDriver.style.display = 'none';
+    const navStops = $('navStops');
+    if (navStops) navStops.style.display = 'flex';
+    const navUsers = $('navUsers');
+    if (navUsers) navUsers.style.display = 'flex';
   }
+  
+  if (state.role) fetchStops();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -532,7 +610,10 @@ async function initCharts() {
 
   let data;
   try {
-    const res = await fetch('http://localhost:3000/api/analytics');
+    const sess = JSON.parse(sessionStorage.getItem('campus_session') || '{}');
+    const res = await fetch('http://localhost:3000/api/analytics', {
+       headers: { 'Authorization': `Bearer ${sess.token}` }
+    });
     if (!res.ok) throw new Error('Analytics unavailable');
     data = await res.json();
   } catch {
@@ -828,7 +909,10 @@ async function populateHistoryDropdown() {
   sel.innerHTML = '<option value="">Fetching vehicles from DB...</option>';
   
   try {
-    const res = await fetch('http://localhost:3000/api/history-devices');
+    const sess = JSON.parse(sessionStorage.getItem('campus_session') || '{}');
+    const res = await fetch('http://localhost:3000/api/history-devices', {
+      headers: { 'Authorization': `Bearer ${sess.token}` }
+    });
     if (!res.ok) throw new Error();
     const data = await res.json();
     
@@ -837,7 +921,6 @@ async function populateHistoryDropdown() {
       sel.innerHTML = '<option value="">No history tracked yet</option>';
       return;
     }
-    
     data.forEach(dev => {
       const opt = document.createElement('option');
       opt.value = dev.id;
@@ -853,22 +936,21 @@ async function populateHistoryDropdown() {
 async function loadHistoryData() {
   const devId = $('historyDeviceSelect').value;
   if (!devId) return showToast('Please select a vehicle first', 'error');
-  
   const btn = $('loadHistoryBtn');
   btn.textContent = 'Loading...';
-  
   try {
-    const res = await fetch(`http://localhost:3000/api/history/${devId}`);
+    const sess = JSON.parse(sessionStorage.getItem('campus_session') || '{}');
+    const res = await fetch('http://localhost:3000/api/history/' + devId, {
+      headers: { 'Authorization': 'Bearer ' + sess.token }
+    });
     if (!res.ok) throw new Error('API Error');
     const rows = await res.json();
-    
     if (!rows.length) {
       showToast('No logged history found for this vehicle', 'info');
       $('playbackControls').style.display = 'none';
       btn.textContent = 'Load History';
       return;
     }
-    
     state.historyData = rows;
     setupPlaybackUI();
   } catch(e) {
@@ -881,20 +963,15 @@ function setupPlaybackUI() {
   $('playbackControls').style.display = 'block';
   $('routeSlider').max = state.historyData.length - 1;
   $('routeSlider').value = 0;
-  
   const start = new Date(state.historyData[0].logged_at).toLocaleTimeString();
-  const end = new Date(state.historyData[state.historyData.length - 1].logged_at).toLocaleTimeString();
-  
+  const end   = new Date(state.historyData[state.historyData.length - 1].logged_at).toLocaleTimeString();
   $('routeStartLabel').textContent = start;
   $('routeEndLabel').textContent = end;
-  
   if (state.historyPolyline) state.historyMap.removeLayer(state.historyPolyline);
-  if (state.historyMarker) state.historyMap.removeLayer(state.historyMarker);
-  
+  if (state.historyMarker)   state.historyMap.removeLayer(state.historyMarker);
   const coords = state.historyData.map(r => [r.lat, r.lng]);
   state.historyPolyline = L.polyline(coords, { color: '#ef4444', weight: 4 }).addTo(state.historyMap);
   state.historyMap.fitBounds(state.historyPolyline.getBounds(), { padding: [30, 30] });
-  
   renderFrame(0);
 }
 
@@ -941,3 +1018,197 @@ function togglePlayback() {
     }, 150); // Playback speed: 150ms per frame
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  DYNAMIC STOPS (Admin Only)
+// ═══════════════════════════════════════════════════════════════════════════
+async function fetchStops() {
+  try {
+    const sessionStr = sessionStorage.getItem('campus_session');
+    if (!sessionStr) return;
+    const token = JSON.parse(sessionStr).token;
+    const res = await fetch('http://localhost:3000/api/stops', { headers: { 'Authorization': `Bearer ${token}` } });
+    if (!res.ok) return;
+    const stops = await res.json();
+    state.GEOFENCES = [{ id: 'campus', name: 'SDIET Campus', lat: 28.4237, lng: 77.4052, radius: 500, color: '#10b981' }];
+    stops.forEach(s => {
+      state.GEOFENCES.push({ id: s.id.toString(), driver_id: s.driver_id, name: s.name, lat: s.lat, lng: s.lng, radius: s.radius || 300, color: s.color || '#3b82f6' });
+    });
+    renderGeofences();
+    if (state.role === 'admin') renderStopsList(stops);
+  } catch (e) {}
+}
+
+function renderGeofences() {
+  if (!state.map) return;
+  state.map.eachLayer(l => {
+    if (l.options && (l.options.className === 'custom-marker zone-marker' || l.options.className === 'custom-marker campus-marker')) state.map.removeLayer(l);
+    if (l instanceof L.Circle) state.map.removeLayer(l);
+  });
+  state.GEOFENCES.forEach(zone => {
+    L.circle([zone.lat, zone.lng], { radius: zone.radius, color: zone.color, fillOpacity: 0.15, weight: 2 }).addTo(state.map);
+    const isCampus = zone.id === 'campus';
+    const svgIcon = isCampus ? `<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>` 
+                             : `<circle cx="12" cy="12" r="10"/><path d="M12 2v20"/><path d="M8 8h8"/><path d="M8 12h8"/>`; 
+    L.marker([zone.lat, zone.lng], {
+      icon: L.divIcon({ className: `custom-marker ${isCampus ? 'campus-marker' : 'zone-marker'}`, html: `<div class="marker-pin" style="background:${zone.color};"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">${svgIcon}</svg></div>`, iconSize: [32, 32], iconAnchor: [16, 32] })
+    }).bindTooltip(zone.name, {permanent: isCampus, direction:'top', offset:[0,-34]}).addTo(state.map);
+  });
+}
+
+let stopPickerMap, stopPickerMarker;
+function initStopsManager() {
+  const form = $('stopForm');
+  const stopsNav = $('navStops');
+  if (!form || !stopsNav) return;
+  
+  stopsNav.addEventListener('click', () => {
+    setTimeout(() => {
+      if (!stopPickerMap) {
+        stopPickerMap = L.map('stopPickerMap', { center: [28.4237, 77.4052], zoom: 12 });
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(stopPickerMap);
+        stopPickerMap.on('click', (e) => {
+          if (stopPickerMarker) stopPickerMap.removeLayer(stopPickerMarker);
+          stopPickerMarker = L.marker(e.latlng).addTo(stopPickerMap);
+          $('stopLat').value = e.latlng.lat.toFixed(6);
+          $('stopLng').value = e.latlng.lng.toFixed(6);
+        });
+      }
+      stopPickerMap.invalidateSize();
+    }, 200);
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const token = JSON.parse(sessionStorage.getItem('campus_session')).token;
+    const res = await fetch('http://localhost:3000/api/stops', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ name: $('stopName').value, driver_id: $('stopDriverId').value, lat: parseFloat($('stopLat').value), lng: parseFloat($('stopLng').value) })
+    });
+    if(res.ok) {
+      showToast('Stop created successfully', 'success');
+      form.reset();
+      if (stopPickerMarker) { stopPickerMap.removeLayer(stopPickerMarker); stopPickerMarker = null; }
+      fetchStops();
+    } else showToast('Failed to create stop', 'error');
+  });
+}
+
+function renderStopsList(stops) {
+  const container = $('stopsListContent');
+  const empty = $('stopsEmptyState');
+  if (!container || !empty) return;
+  if (stops.length === 0) { empty.style.display = 'block'; container.innerHTML = ''; return; }
+  empty.style.display = 'none';
+  container.innerHTML = stops.map(s => `
+    <div style="background: rgba(0,0,0,0.02); padding: 12px; margin-bottom: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; border: 1px solid var(--border);">
+       <div><b>${s.name}</b><br><small style="color:var(--text-muted)">Driver: ${s.driver_id}</small></div>
+       <button onclick="deleteStop(${s.id})" style="background: rgba(239,68,68,0.1); border: none; color: #ef4444; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 500;">Delete</button>
+    </div>
+  `).join('');
+}
+
+window.deleteStop = async (id) => {
+  const token = JSON.parse(sessionStorage.getItem('campus_session')).token;
+  await fetch(`http://localhost:3000/api/stops/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` }});
+  fetchStops();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  USER MANAGEMENT (Admin Only)
+// ═══════════════════════════════════════════════════════════════════════════
+function getAdminToken() {
+  return JSON.parse(sessionStorage.getItem('campus_session') || '{}').token;
+}
+
+async function fetchUsers() {
+  const tbody = document.getElementById('usersTableBody');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">Loading...</td></tr>';
+  try {
+    const res = await fetch('http://localhost:3000/api/users', {
+      headers: { 'Authorization': 'Bearer ' + getAdminToken() }
+    });
+    if (!res.ok) throw new Error();
+    const users = await res.json();
+    if (!users.length) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-muted);">No users found.</td></tr>'; return; }
+    const roleColors = { admin: '#f59e0b', driver: '#6366f1', student: '#10b981' };
+    tbody.innerHTML = users.map(u => '<tr style="border-bottom:1px solid var(--border);" onmouseover="this.style.background=\'rgba(0,0,0,0.03)\'" onmouseout="this.style.background=\'none\'">' +
+      '<td style="padding:12px;">#' + u.id + '</td>' +
+      '<td style="padding:12px;font-weight:600;">' + u.username + '</td>' +
+      '<td style="padding:12px;"><span style="background:' + (roleColors[u.role]||'#ccc') + '22;color:' + (roleColors[u.role]||'#ccc') + ';padding:3px 10px;border-radius:20px;font-size:0.8rem;font-weight:700;text-transform:uppercase;">' + u.role + '</span></td>' +
+      '<td style="padding:12px;"><select onchange="updateUserRole(' + u.id + ', this.value)" class="select-input" style="padding:6px 8px;font-size:0.85rem;">' +
+        '<option value="student"' + (u.role==='student'?' selected':'') + '>Student</option>' +
+        '<option value="driver"'  + (u.role==='driver' ?' selected':'') + '>Driver</option>'  +
+        '<option value="admin"'   + (u.role==='admin'  ?' selected':'') + '>Admin</option>'   +
+      '</select></td>' +
+      '<td style="padding:12px;"><button onclick="resetUserPassword(' + u.id + ',\'' + u.username + '\')" style="background:rgba(99,102,241,0.1);border:none;color:#6366f1;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:500;font-size:0.85rem;">Reset PW</button></td>' +
+      '<td style="padding:12px;text-align:right;"><button onclick="deleteUser(' + u.id + ',\'' + u.username + '\')" style="background:rgba(239,68,68,0.1);border:none;color:#ef4444;padding:6px 12px;border-radius:6px;cursor:pointer;font-weight:500;font-size:0.85rem;">Delete</button></td>' +
+    '</tr>').join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#ef4444;">Failed to load users.</td></tr>';
+  }
+}
+
+(function attachCreateUserForm() {
+  // Retry binding when the view becomes visible — avoids the IIFE firing before DOM is ready
+  function tryBind() {
+    const form = document.getElementById('createUserForm');
+    if (!form || form.dataset.bound) return;
+    form.dataset.bound = '1';
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const errEl = document.getElementById('createUserError');
+      errEl.style.display = 'none';
+      const btn = form.querySelector('button[type="submit"]');
+      const origText = btn.textContent;
+      btn.textContent = 'Creating...'; btn.disabled = true;
+      try {
+        const res = await fetch('http://localhost:3000/api/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getAdminToken() },
+          body: JSON.stringify({ username: document.getElementById('newUsername').value.trim(), password: document.getElementById('newPassword').value, role: document.getElementById('newRole').value })
+        });
+        const data = await res.json();
+        if (res.ok) { showToast('User "' + document.getElementById('newUsername').value + '" created!', 'success'); form.reset(); fetchUsers(); }
+        else { errEl.textContent = data.error || 'Failed to create user.'; errEl.style.display = 'block'; }
+      } catch { errEl.textContent = 'Network error.'; errEl.style.display = 'block'; }
+      btn.textContent = origText; btn.disabled = false;
+    });
+  }
+  // Try immediately (in case DOM is ready), then also try after load
+  tryBind();
+  document.addEventListener('DOMContentLoaded', tryBind);
+  // Also expose for switchView to call
+  window._bindCreateUserForm = tryBind;
+})();
+
+window.updateUserRole = async function(id, role) {
+  const res = await fetch('http://localhost:3000/api/users/' + id, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getAdminToken() },
+    body: JSON.stringify({ role: role })
+  });
+  showToast(res.ok ? 'Role updated!' : 'Failed to update role', res.ok ? 'success' : 'error');
+  if (res.ok) fetchUsers();
+};
+
+window.resetUserPassword = async function(id, username) {
+  const newPw = prompt('Enter new password for "' + username + '":');
+  if (!newPw || newPw.length < 4) { showToast('Password too short (min 4 chars)', 'error'); return; }
+  const res = await fetch('http://localhost:3000/api/users/' + id, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getAdminToken() },
+    body: JSON.stringify({ password: newPw })
+  });
+  showToast(res.ok ? 'Password reset for "' + username + '"' : 'Failed to reset password', res.ok ? 'success' : 'error');
+};
+
+window.deleteUser = async function(id, username) {
+  if (!confirm('Delete user "' + username + '"? This cannot be undone.')) return;
+  const res = await fetch('http://localhost:3000/api/users/' + id, {
+    method: 'DELETE', headers: { 'Authorization': 'Bearer ' + getAdminToken() }
+  });
+  const data = await res.json();
+  if (res.ok) { showToast('User "' + username + '" deleted', 'success'); fetchUsers(); }
+  else showToast(data.error || 'Failed to delete user', 'error');
+};
